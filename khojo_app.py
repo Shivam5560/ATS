@@ -290,7 +290,7 @@ def main():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("🧠 BRAINY BUDDY")
+    st.title("📝 KHOJO BHAI")
     st.markdown("#### Your AI-powered Resume Analyzer")
 
     if "file_paths" not in st.session_state:
@@ -315,7 +315,7 @@ def main():
         if st.button("Analyze Resume"):
             if job_description:
                 with st.spinner("Analyzing resume..."):
-                    response = st.session_state.model.query("Extract key information from the resume and format it as a dictionary.").response
+                    response = st.session_state.model.query(template).response
                     try:
                         resume_dict = eval(response)
                         score = advanced_ats_similarity_score(resume_dict, job_description)
