@@ -9,4 +9,3 @@ numpy
 nltk
 fuzzywuzzy
 plotly
-litereval
