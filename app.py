@@ -234,7 +234,7 @@ def main():
                 #st.text_area("Response", value=response)
                 # st.markdown(f"**Formatted Response:**\n{str(response)}")
                 # st.text_area(response)
-                score = ats_similarity_score(response, job_description)
+                score = ats_similarity_score(response, jobd)
                 st.markdown(score)
 
     else:
