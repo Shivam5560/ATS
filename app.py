@@ -11,23 +11,36 @@ from llama_index.llms.groq import Groq
 import tempfile
 from dotenv import load_dotenv
 import os
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import spacy
-import re
-from fuzzywuzzy import fuzz
-import numpy as np
 
-# Download necessary NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
+def ats_similarity_score(resume_dict, job_description):
+    # Combine relevant sections from the resume
+    resume_text = " ".join([
+        " ".join([exp["job_title"] + " " + exp["company"] + " " + " ".join(exp["responsibilities"]) 
+                  for exp in resume_dict["work_experience"]]),
+        " ".join([proj["name"] + " " + proj["description"] for proj in resume_dict["projects"]]),
+        " ".join(resume_dict["skills"]),
+        " ".join(resume_dict["certifications"])
+    ])
 
-# Load spaCy model
-nlp = spacy.load("en_core_web_sm")
+    # Create TF-IDF vectors
+    vectorizer = TfidfVectorizer()
+    vectors = vectorizer.fit_transform([resume_text, job_description])
+
+    # Calculate cosine similarity
+    similarity = cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
+
+    # Convert to a score out of 100
+    score = round(similarity * 100, 2)
+
+    # Determine if the resume is accepted (you can adjust the threshold)
+    is_accepted = score >= 70
+
+    return {
+        "similarity_score": score,
+        "is_accepted": is_accepted
+    }
 
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
 template = """You are an AI assistant trained to extract key information from resumes. Your task is to analyze the given resume text and extract relevant details into a structured dictionary format. Please follow these guidelines:
@@ -83,88 +96,6 @@ Resume text:
 [Insert resume text here]
 
 Please provide the extracted information in the specified dictionary format.")"""
-
-
-def preprocess_text(text):
-    # Convert to lowercase and remove special characters
-    text = re.sub(r'[^\w\s]', '', text.lower())
-    
-    # Tokenize
-    tokens = word_tokenize(text)
-    
-    # Remove stopwords
-    stop_words = set(stopwords.words('english'))
-    tokens = [token for token in tokens if token not in stop_words]
-    
-    # Lemmatize
-    doc = nlp(" ".join(tokens))
-    lemmatized = [token.lemma_ for token in doc]
-    
-    return " ".join(lemmatized)
-
-def extract_key_phrases(text):
-    doc = nlp(text)
-    return [chunk.text for chunk in doc.noun_chunks]
-
-def keyword_matching(resume_text, job_desc):
-    resume_keywords = set(extract_key_phrases(resume_text))
-    job_keywords = set(extract_key_phrases(job_desc))
-    
-    matched = resume_keywords.intersection(job_keywords)
-    return len(matched) / len(job_keywords) if job_keywords else 0
-
-def fuzzy_match_score(resume_text, job_desc):
-    return fuzz.token_set_ratio(resume_text, job_desc) / 100
-
-def tfidf_similarity(resume_text, job_desc):
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform([resume_text, job_desc])
-    return cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-
-def calculate_section_score(section, job_desc):
-    preprocessed_section = preprocess_text(" ".join(section))
-    preprocessed_job_desc = preprocess_text(job_desc)
-    
-    keyword_score = keyword_matching(preprocessed_section, preprocessed_job_desc)
-    fuzzy_score = fuzzy_match_score(preprocessed_section, preprocessed_job_desc)
-    tfidf_score = tfidf_similarity(preprocessed_section, preprocessed_job_desc)
-    
-    return (keyword_score + fuzzy_score + tfidf_score) / 3
-
-def advanced_ats_similarity_score(resume_dict, job_description):
-    # Prepare sections
-    work_exp = " ".join([f"{exp['job_title']} {exp['company']} {' '.join(exp['responsibilities'])}" 
-                         for exp in resume_dict["work_experience"]])
-    projects = " ".join([f"{proj['name']} {proj['description']}" for proj in resume_dict["projects"]])
-    skills = " ".join(resume_dict["skills"])
-    certifications = " ".join(resume_dict["certifications"])
-
-    # Calculate scores for each section
-    work_exp_score = calculate_section_score([work_exp], job_description)
-    projects_score = calculate_section_score([projects], job_description)
-    skills_score = calculate_section_score([skills], job_description)
-    cert_score = calculate_section_score([certifications], job_description)
-
-    # Weighted average of scores (you can adjust weights)
-    weights = [0.4, 0.3, 0.2, 0.1]  # work_exp, projects, skills, certifications
-    final_score = np.average([work_exp_score, projects_score, skills_score, cert_score], weights=weights)
-
-    # Convert to a score out of 100
-    score = round(final_score * 100, 2)
-
-    # Determine if the resume is accepted (you can adjust the threshold)
-    is_accepted = score >= 70
-
-    return {
-        "similarity_score": score,
-        "is_accepted": is_accepted,
-        "section_scores": {
-            "work_experience": round(work_exp_score * 100, 2),
-            "projects": round(projects_score * 100, 2),
-            "skills": round(skills_score * 100, 2),
-            "certifications": round(cert_score * 100, 2)
-        }
-    }
 
 
 
