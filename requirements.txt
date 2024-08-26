@@ -5,3 +5,6 @@ llama-index-embeddings-huggingface
 streamlit
 python-dotenv
 scikit-learn
+numpy
+nltk
+fuzzywuzzy

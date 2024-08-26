@@ -14,6 +14,120 @@ import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import re
+from fuzzywuzzy import fuzz
+import numpy as np
+
+# Download necessary NLTK data
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('wordnet')
+
+# Initialize lemmatizer
+lemmatizer = WordNetLemmatizer()
+
+def preprocess_text(text):
+    # Convert to lowercase and remove special characters
+    text = re.sub(r'[^\w\s]', '', text.lower())
+    
+    # Tokenize
+    tokens = word_tokenize(text)
+    
+    # Remove stopwords
+    stop_words = set(stopwords.words('english'))
+    tokens = [token for token in tokens if token not in stop_words]
+    
+    # Lemmatize
+    lemmatized = [lemmatizer.lemmatize(token) for token in tokens]
+    
+    return " ".join(lemmatized)
+
+def extract_key_phrases(text):
+    tokens = word_tokenize(text)
+    pos_tags = nltk.pos_tag(tokens)
+    
+    noun_phrases = []
+    current_phrase = []
+    
+    for word, tag in pos_tags:
+        if tag.startswith('NN'):
+            current_phrase.append(word)
+        elif current_phrase:
+            noun_phrases.append(' '.join(current_phrase))
+            current_phrase = []
+    
+    if current_phrase:
+        noun_phrases.append(' '.join(current_phrase))
+    
+    return noun_phrases
+
+def keyword_matching(resume_text, job_desc):
+    resume_keywords = set(extract_key_phrases(resume_text))
+    job_keywords = set(extract_key_phrases(job_desc))
+    
+    matched = resume_keywords.intersection(job_keywords)
+    return len(matched) / len(job_keywords) if job_keywords else 0
+
+def fuzzy_match_score(resume_text, job_desc):
+    return fuzz.token_set_ratio(resume_text, job_desc) / 100
+
+def tfidf_similarity(resume_text, job_desc):
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform([resume_text, job_desc])
+    return cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+
+def calculate_section_score(section, job_desc):
+    preprocessed_section = preprocess_text(" ".join(section))
+    preprocessed_job_desc = preprocess_text(job_desc)
+    
+    keyword_score = keyword_matching(preprocessed_section, preprocessed_job_desc)
+    fuzzy_score = fuzzy_match_score(preprocessed_section, preprocessed_job_desc)
+    tfidf_score = tfidf_similarity(preprocessed_section, preprocessed_job_desc)
+    
+    return (keyword_score + fuzzy_score + tfidf_score) / 3
+
+def advanced_ats_similarity_score(resume_dict, job_description):
+    # Prepare sections
+    work_exp = " ".join([f"{exp['job_title']} {exp['company']} {' '.join(exp['responsibilities'])}" 
+                         for exp in resume_dict["work_experience"]])
+    projects = " ".join([f"{proj['name']} {proj['description']}" for proj in resume_dict["projects"]])
+    skills = " ".join(resume_dict["skills"])
+    certifications = " ".join(resume_dict["certifications"])
+
+    # Calculate scores for each section
+    work_exp_score = calculate_section_score([work_exp], job_description)
+    projects_score = calculate_section_score([projects], job_description)
+    skills_score = calculate_section_score([skills], job_description)
+    cert_score = calculate_section_score([certifications], job_description)
+
+    # Weighted average of scores (you can adjust weights)
+    weights = [0.4, 0.3, 0.2, 0.1]  # work_exp, projects, skills, certifications
+    final_score = np.average([work_exp_score, projects_score, skills_score, cert_score], weights=weights)
+
+    # Convert to a score out of 100
+    score = round(final_score * 100, 2)
+
+    # Determine if the resume is accepted (you can adjust the threshold)
+    is_accepted = score >= 70
+
+    return {
+        "similarity_score": score,
+        "is_accepted": is_accepted,
+        "section_scores": {
+            "work_experience": round(work_exp_score * 100, 2),
+            "projects": round(projects_score * 100, 2),
+            "skills": round(skills_score * 100, 2),
+            "certifications": round(cert_score * 100, 2)
+        }
+    }
+
 def ats_similarity_score(resume_dict, job_description):
     if not isinstance(resume_dict, dict):
         print(f"Error: resume_dict is not a dictionary. Type: {type(resume_dict)}")
@@ -249,7 +363,7 @@ def main():
                     st.write(response)  # This will display the content of response
                     return
 
-                score = ats_similarity_score(response, jobd)
+                score = advanced_ats_similarity_score(response, jobd)
                 st.markdown(score)
 
     else:
