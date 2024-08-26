@@ -166,7 +166,7 @@ def advanced_ats_similarity_score(resume_dict, job_description):
         },
         "experience_factor": experience_factor
     }
-    }
+
 def get_llm_score(resume_dict, job_description, llm):
     prompt = f"""
     Given the following resume and job description, provide a similarity score between 0 and 100.
