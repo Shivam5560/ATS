@@ -247,7 +247,7 @@ def generate_model(file_paths):
         return None
 
 def main():
-    st.set_page_config(page_title="BRAINY BUDDY", page_icon="🧠", layout="wide")
+    st.set_page_config(page_title="KHOJO BHAI", page_icon="📝", layout="wide")
 
     # Custom CSS for improved UI
     st.markdown("""
