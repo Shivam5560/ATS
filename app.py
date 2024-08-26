@@ -224,6 +224,7 @@ def main():
     if st.session_state.model:
         #user_input = st.text_input("Question", key="question_input", placeholder="Ask your question here...", label_visibility="collapsed")
         user_input = template
+        jobd = st.text_input("Job Description", key="jobd", placeholder="JoB Description.", label_visibility="collapsed")
         _,col2,_ = st.columns(3)
         with col2:
             button = st.button(label='Enter',type='primary')
@@ -233,8 +234,7 @@ def main():
                 #st.text_area("Response", value=response)
                 # st.markdown(f"**Formatted Response:**\n{str(response)}")
                 # st.text_area(response)
-                jobd = st.text_input("Job Description", key="jobd", placeholder="JoB Description.", label_visibility="collapsed")
-                score = advanced_ats_similarity_score(response, job_description)
+                score = ats_similarity_score(response, job_description)
                 st.markdown(score)
 
     else:
