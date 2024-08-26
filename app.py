@@ -15,6 +15,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 def ats_similarity_score(resume_dict, job_description):
+    if not isinstance(resume_dict, dict):
+        print(f"Error: resume_dict is not a dictionary. Type: {type(resume_dict)}")
+        print(f"Content: {resume_dict}")
+        return {"error": "Invalid resume format"}
     # Combine relevant sections from the resume
     resume_text = " ".join([
         " ".join([exp["job_title"] + " " + exp["company"] + " " + " ".join(exp["responsibilities"]) 
@@ -233,7 +237,18 @@ def main():
                 response = st.session_state.model.query(user_input).response
                 #st.text_area("Response", value=response)
                 # st.markdown(f"**Formatted Response:**\n{str(response)}")
-                st.markdown(response)
+                if isinstance(response, str):
+                    try:
+                        response = eval(response)  # This converts the string to a dictionary if it's in the correct format
+                    except:
+                        st.error("Error: Response is not in the correct format")
+                        return
+
+                if not isinstance(response, dict):
+                    st.error(f"Error: Response is not a dictionary. Type: {type(response)}")
+                    st.write(response)  # This will display the content of response
+                    return
+
                 score = ats_similarity_score(response, jobd)
                 st.markdown(score)
 
