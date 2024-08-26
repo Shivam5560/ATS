@@ -19,6 +19,59 @@ import tempfile
 from dotenv import load_dotenv
 import os
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
+template = """You are an AI assistant trained to extract key information from resumes. Your task is to analyze the given resume text and extract relevant details into a structured dictionary format. Please follow these guidelines:
+
+1. Read the entire resume carefully.
+2. Extract the following information:
+   - Personal Information (name, email, phone number)
+   - Education (degrees, institutions, graduation dates)
+   - Work Experience (job titles, companies, dates, key responsibilities)
+   - Skills
+   - Projects (if any)
+   - Certifications (if any)
+
+3. Organize the extracted information into a dictionary with the following structure:
+
+{
+    "personal_info": {
+        "name": "",
+        "email": "",
+        "phone": ""
+    },
+    "education": [
+        {
+            "degree": "",
+            "institution": "",
+            "graduation_date": ""
+        }
+    ],
+    "work_experience": [
+        {
+            "job_title": "",
+            "company": "",
+            "dates": "",
+            "responsibilities": []
+        }
+    ],
+    "skills": [],
+    "projects": [
+        {
+            "name": "",
+            "description": ""
+        }
+    ],
+    "certifications": []
+}
+
+4. Fill in the dictionary with the extracted information.
+5. If any section is not present in the resume, leave it as an empty list or dictionary as appropriate.
+6. Ensure all extracted information is accurate and relevant.
+7. Return the completed dictionary.
+
+Resume text:
+[Insert resume text here]
+
+Please provide the extracted information in the specified dictionary format.")"""
 
 load_dotenv()
 HF_KEY  =  os.getenv("HF_KEY")
@@ -35,6 +88,7 @@ def save_uploaded_files(uploaded_files):
     return file_paths
 
 def generate_model(file_paths):
+    global template
     try:
         if not file_paths:
             st.error("Please upload files to proceed.")
@@ -60,13 +114,14 @@ def generate_model(file_paths):
         storage_context = StorageContext.from_defaults(persist_dir="./storage_mini")
         index = load_index_from_storage(storage_context,) #service_context=service_context)
         st.success("PDF loaded successfully!")
-        chat_engine = index.as_query_engine(similarity_top_k=2,BasePromptTemplate="You are an agent designed to answer queries over a set of given papers. Please always use the tools provided to answer a question. Do not rely on prior knowledge. Also try to give the responses in the form of bullet points for ease on the end user side.Given the context information above I want you to think step by step to answer the query in a crisp manner, incase case you don't know the answer say 'I don't know!'.")
+        chat_engine = index.as_query_engine(similarity_top_k=2,BasePromptTemplate=template)
         return chat_engine
     except Exception as e:
         st.error(f"An error occurred: {e}")
         return None
 
 def main():
+    global template
     st.set_page_config(
         page_title="RAG Based Chatbot",
         page_icon="🤖",
@@ -141,15 +196,17 @@ def main():
                 st.session_state.model = generate_model(file_paths)
 
     if st.session_state.model:
-        user_input = st.text_input("Question", key="question_input", placeholder="Ask your question here...", label_visibility="collapsed")
+        #user_input = st.text_input("Question", key="question_input", placeholder="Ask your question here...", label_visibility="collapsed")
+        user_input = template
         _,col2,_ = st.columns(3)
         with col2:
             button = st.button(label='Enter',type='primary')
         if button:
             with st.spinner():
-                response = str(st.session_state.model.query(user_input).response)
+                response = st.session_state.model.query(user_input).response
                 #st.text_area("Response", value=response)
-                st.markdown(f"**Formatted Response:**\n{response}")
+                st.markdown(f"**Formatted Response:**\n{str(response)}")
+                st.text_area(response)
     else:
         st.info("Please upload files to initiate the chatbot.")
 
