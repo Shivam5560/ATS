@@ -24,11 +24,18 @@ import re
 from fuzzywuzzy import fuzz
 import numpy as np
 
-# Download necessary NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('wordnet')
+# Function to safely download NLTK data
+def safe_nltk_download(package):
+    try:
+        nltk.download(package, quiet=True)
+    except Exception as e:
+        print(f"Failed to download {package}: {e}")
+
+# Attempt to download necessary NLTK data
+safe_nltk_download('punkt')
+safe_nltk_download('stopwords')
+safe_nltk_download('averaged_perceptron_tagger')
+safe_nltk_download('wordnet')
 
 # Initialize lemmatizer
 lemmatizer = WordNetLemmatizer()
@@ -37,21 +44,37 @@ def preprocess_text(text):
     # Convert to lowercase and remove special characters
     text = re.sub(r'[^\w\s]', '', text.lower())
     
-    # Tokenize
-    tokens = word_tokenize(text)
+    # Tokenize (fallback to simple split if word_tokenize fails)
+    try:
+        tokens = word_tokenize(text)
+    except LookupError:
+        tokens = text.split()
     
-    # Remove stopwords
-    stop_words = set(stopwords.words('english'))
-    tokens = [token for token in tokens if token not in stop_words]
+    # Remove stopwords (if available)
+    try:
+        stop_words = set(stopwords.words('english'))
+        tokens = [token for token in tokens if token not in stop_words]
+    except LookupError:
+        pass  # Proceed without removing stopwords
     
-    # Lemmatize
-    lemmatized = [lemmatizer.lemmatize(token) for token in tokens]
+    # Lemmatize (fallback to original word if lemmatization fails)
+    lemmatized = []
+    for token in tokens:
+        try:
+            lemmatized.append(lemmatizer.lemmatize(token))
+        except LookupError:
+            lemmatized.append(token)
     
     return " ".join(lemmatized)
 
 def extract_key_phrases(text):
-    tokens = word_tokenize(text)
-    pos_tags = nltk.pos_tag(tokens)
+    try:
+        tokens = word_tokenize(text)
+        pos_tags = nltk.pos_tag(tokens)
+    except LookupError:
+        # Fallback to simple tokenization and assume all words are nouns
+        tokens = text.split()
+        pos_tags = [(token, 'NN') for token in tokens]
     
     noun_phrases = []
     current_phrase = []
@@ -126,38 +149,6 @@ def advanced_ats_similarity_score(resume_dict, job_description):
             "skills": round(skills_score * 100, 2),
             "certifications": round(cert_score * 100, 2)
         }
-    }
-
-def ats_similarity_score(resume_dict, job_description):
-    if not isinstance(resume_dict, dict):
-        print(f"Error: resume_dict is not a dictionary. Type: {type(resume_dict)}")
-        print(f"Content: {resume_dict}")
-        return {"error": "Invalid resume format"}
-    # Combine relevant sections from the resume
-    resume_text = " ".join([
-        " ".join([exp["job_title"] + " " + exp["company"] + " " + " ".join(exp["responsibilities"]) 
-                  for exp in resume_dict["work_experience"]]),
-        " ".join([proj["name"] + " " + proj["description"] for proj in resume_dict["projects"]]),
-        " ".join(resume_dict["skills"]),
-        " ".join(resume_dict["certifications"])
-    ])
-
-    # Create TF-IDF vectors
-    vectorizer = TfidfVectorizer()
-    vectors = vectorizer.fit_transform([resume_text, job_description])
-
-    # Calculate cosine similarity
-    similarity = cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
-
-    # Convert to a score out of 100
-    score = round(similarity * 100, 2)
-
-    # Determine if the resume is accepted (you can adjust the threshold)
-    is_accepted = score >= 70
-
-    return {
-        "similarity_score": score,
-        "is_accepted": is_accepted
     }
 
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
