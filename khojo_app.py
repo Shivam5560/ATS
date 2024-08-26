@@ -23,6 +23,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import re
 from fuzzywuzzy import fuzz
 import numpy as np
+import ast
 
 def extract_years_of_experience(resume_dict):
     total_years = 0
