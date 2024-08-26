@@ -363,7 +363,16 @@ def main():
                 with st.spinner("Analyzing resume..."):
                     response = st.session_state.model.query("Extract key information from the resume and format it as a dictionary.").response
                     try:
-                        resume_dict = eval(response)
+                        resume_dict = ast.literal_eval(response)
+                    except ValueError:
+                        # If literal_eval fails, try to clean the string
+                        cleaned_response = response.strip().replace('\n', '').replace(' ', '')
+                        try:
+                            resume_dict = ast.literal_eval(cleaned_response)
+                        except ValueError:
+                            st.error("Unable to parse the resume information. Please check the model's output format.")
+                            return
+                    try:
                         score = advanced_ats_similarity_score(resume_dict, job_description)
                         
                         # Get LLM score
