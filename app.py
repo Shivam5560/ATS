@@ -24,47 +24,36 @@ import re
 from fuzzywuzzy import fuzz
 import numpy as np
 
-# Function to safely download NLTK data
 def safe_nltk_download(package):
     try:
         nltk.download(package, quiet=True)
     except Exception as e:
         print(f"Failed to download {package}: {e}")
 
-# Attempt to download necessary NLTK data
 safe_nltk_download('punkt')
 safe_nltk_download('stopwords')
 safe_nltk_download('averaged_perceptron_tagger')
 safe_nltk_download('wordnet')
 
-# Initialize lemmatizer
 lemmatizer = WordNetLemmatizer()
 
 def preprocess_text(text):
-    # Convert to lowercase and remove special characters
     text = re.sub(r'[^\w\s]', '', text.lower())
-    
-    # Tokenize (fallback to simple split if word_tokenize fails)
     try:
         tokens = word_tokenize(text)
     except LookupError:
         tokens = text.split()
-    
-    # Remove stopwords (if available)
     try:
         stop_words = set(stopwords.words('english'))
         tokens = [token for token in tokens if token not in stop_words]
     except LookupError:
-        pass  # Proceed without removing stopwords
-    
-    # Lemmatize (fallback to original word if lemmatization fails)
+        pass
     lemmatized = []
     for token in tokens:
         try:
             lemmatized.append(lemmatizer.lemmatize(token))
         except LookupError:
             lemmatized.append(token)
-    
     return " ".join(lemmatized)
 
 def extract_key_phrases(text):
@@ -72,7 +61,6 @@ def extract_key_phrases(text):
         tokens = word_tokenize(text)
         pos_tags = nltk.pos_tag(tokens)
     except LookupError:
-        # Fallback to simple tokenization and assume all words are nouns
         tokens = text.split()
         pos_tags = [(token, 'NN') for token in tokens]
     
@@ -80,7 +68,7 @@ def extract_key_phrases(text):
     current_phrase = []
     
     for word, tag in pos_tags:
-        if tag.startswith('NN'):
+        if tag.startswith('NN') or tag.startswith('JJ'):  # Include adjectives
             current_phrase.append(word)
         elif current_phrase:
             noun_phrases.append(' '.join(current_phrase))
@@ -114,31 +102,33 @@ def calculate_section_score(section, job_desc):
     fuzzy_score = fuzzy_match_score(preprocessed_section, preprocessed_job_desc)
     tfidf_score = tfidf_similarity(preprocessed_section, preprocessed_job_desc)
     
-    return (keyword_score + fuzzy_score + tfidf_score) / 3
+    # Increase the base score and adjust the weights
+    base_score = 0.5  # Start with a base score of 0.5
+    weighted_score = (keyword_score * 0.4 + fuzzy_score * 0.3 + tfidf_score * 0.3) * 0.5
+    
+    return base_score + weighted_score
 
 def advanced_ats_similarity_score(resume_dict, job_description):
-    # Prepare sections
     work_exp = " ".join([f"{exp['job_title']} {exp['company']} {' '.join(exp['responsibilities'])}" 
                          for exp in resume_dict["work_experience"]])
     projects = " ".join([f"{proj['name']} {proj['description']}" for proj in resume_dict["projects"]])
     skills = " ".join(resume_dict["skills"])
     certifications = " ".join(resume_dict["certifications"])
 
-    # Calculate scores for each section
     work_exp_score = calculate_section_score([work_exp], job_description)
     projects_score = calculate_section_score([projects], job_description)
     skills_score = calculate_section_score([skills], job_description)
     cert_score = calculate_section_score([certifications], job_description)
 
-    # Weighted average of scores (you can adjust weights)
-    weights = [0.4, 0.3, 0.2, 0.1]  # work_exp, projects, skills, certifications
+    # Adjust weights to favor skills and work experience
+    weights = [0.35, 0.25, 0.3, 0.1]  # work_exp, projects, skills, certifications
     final_score = np.average([work_exp_score, projects_score, skills_score, cert_score], weights=weights)
 
-    # Convert to a score out of 100
-    score = round(final_score * 100, 2)
-
-    # Determine if the resume is accepted (you can adjust the threshold)
-    is_accepted = score >= 70
+    # Apply a more lenient scoring curve
+    curved_score = min(1.0, final_score * 1.2)  # Increase scores by up to 20%
+    
+    score = round(curved_score * 100, 2)
+    is_accepted = score >= 65  # Lower the acceptance threshold
 
     return {
         "similarity_score": score,
@@ -150,6 +140,7 @@ def advanced_ats_similarity_score(resume_dict, job_description):
             "certifications": round(cert_score * 100, 2)
         }
     }
+
 
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
 template = """You are an AI assistant trained to extract key information from resumes. Your task is to analyze the given resume text and extract relevant details into a structured dictionary format. Please follow these guidelines:
