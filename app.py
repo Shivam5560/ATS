@@ -233,7 +233,7 @@ def main():
                 response = st.session_state.model.query(user_input).response
                 #st.text_area("Response", value=response)
                 # st.markdown(f"**Formatted Response:**\n{str(response)}")
-                # st.text_area(response)
+                st.markdown(response)
                 score = ats_similarity_score(response, jobd)
                 st.markdown(score)
 
