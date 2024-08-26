@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
+import plotly.graph_objects as go
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -121,7 +121,7 @@ def advanced_ats_similarity_score(resume_dict, job_description):
     cert_score = calculate_section_score([certifications], job_description)
 
     # Adjust weights to favor skills and work experience
-    weights = [0.35, 0.25, 0.3, 0.1]  # work_exp, projects, skills, certifications
+    weights = [0.40, 0.30, 0.25, 0.05]  # work_exp, projects, skills, certifications
     final_score = np.average([work_exp_score, projects_score, skills_score, cert_score], weights=weights)
 
     # Apply a more lenient scoring curve
@@ -332,7 +332,8 @@ def main():
             with st.spinner():
                 response = st.session_state.model.query(user_input).response
                 #st.text_area("Response", value=response)
-                # st.markdown(f"**Formatted Response:**\n{str(response)}")
+                with st.expander("Click to view Extracted details"):
+                    st.markdown(f"**Formatted Resume :**\n{str(response)}")
                 if isinstance(response, str):
                     try:
                         response = eval(response)  # This converts the string to a dictionary if it's in the correct format
@@ -346,7 +347,24 @@ def main():
                     return
 
                 score = advanced_ats_similarity_score(response, jobd)
-                st.markdown(score)
+                # Display similarity score with a pie chart
+                fig = go.Figure(data=[go.Pie(values=[score['similarity_score'], 1-score['similarity_score']], 
+                             hole=.3, 
+                             marker_colors=['#1f77b4', '#d3d3d3'])])
+                fig.update_layout(annotations=[dict(text=f"{score['similarity_score']:.2f}", x=0.5, y=0.5, font_size=20, showarrow=False)])
+                st.plotly_chart(fig)
+
+                # Display is_accepted with color
+                color = "green" if score['is_accepted'] else "red"
+                st.markdown(f"<h3 style='text-align: center; color: {color};'>{'Accepted' if score['is_accepted'] else 'Not Accepted'}</h3>", unsafe_allow_html=True)
+
+                # Display section scores
+                st.header("Section Scores")
+                for section, section_score in score['section_scores'].items():
+                    st.subheader(f"{section.replace('_', ' ').title()}")
+                    st.progress(section_score / 100)
+                    st.write(f"{section_score}%")
+
 
     else:
         st.info("Please upload files to initiate the chatbot.")
