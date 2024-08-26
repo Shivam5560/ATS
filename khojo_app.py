@@ -23,7 +23,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import re
 from fuzzywuzzy import fuzz
 import numpy as np
-import ast
+import json
 
 def extract_years_of_experience(resume_dict):
     total_years = 0
@@ -363,14 +363,15 @@ def main():
             if job_description:
                 with st.spinner("Analyzing resume..."):
                     response = st.session_state.model.query("Extract key information from the resume and format it as a dictionary.").response
+
                     try:
-                        resume_dict = ast.literal_eval(response)
-                    except ValueError:
-                        # If literal_eval fails, try to clean the string
+                        resume_dict = json.loads(response)
+                    except json.JSONDecodeError:
+                        # If json.loads fails, try to clean the string
                         cleaned_response = response.strip().replace('\n', '').replace(' ', '')
                         try:
-                            resume_dict = ast.literal_eval(cleaned_response)
-                        except ValueError:
+                            resume_dict = json.loads(cleaned_response)
+                        except json.JSONDecodeError:
                             st.error("Unable to parse the resume information. Please check the model's output format.")
                             return
                     try:
