@@ -24,6 +24,28 @@ import re
 from fuzzywuzzy import fuzz
 import numpy as np
 
+def extract_years_of_experience(resume_dict):
+    total_years = 0
+    for exp in resume_dict.get("work_experience", []):
+        dates = exp.get("dates", "")
+        if "-" in dates:
+            start, end = dates.split("-")
+            try:
+                years = int(end.strip()) - int(start.strip())
+                total_years += years
+            except ValueError:
+                pass
+    return total_years
+
+def check_experience_requirement(job_desc, resume_dict):
+    required_years = re.search(r'(\d+)\+?\s*years?\s*(?:of)?\s*experience', job_desc, re.IGNORECASE)
+    if required_years:
+        required_years = int(required_years.group(1))
+        actual_years = extract_years_of_experience(resume_dict)
+        if actual_years < required_years:
+            return 0.5  # Penalty factor
+    return 1  # No penalty
+
 def safe_nltk_download(package):
     try:
         nltk.download(package, quiet=True)
@@ -127,8 +149,11 @@ def advanced_ats_similarity_score(resume_dict, job_description):
     # Apply a more lenient scoring curve
     curved_score = min(1.0, final_score * 1.2)  # Increase scores by up to 20%
     
-    score = round(curved_score * 100, 2)
-    is_accepted = score >= 65  # Lower the acceptance threshold
+    experience_factor = check_experience_requirement(job_description, resume_dict)
+    final_score *= experience_factor
+
+    score = round(final_score * 100, 2)
+    is_accepted = score >= 65
 
     return {
         "similarity_score": score,
@@ -138,8 +163,29 @@ def advanced_ats_similarity_score(resume_dict, job_description):
             "projects": round(projects_score * 100, 2),
             "skills": round(skills_score * 100, 2),
             "certifications": round(cert_score * 100, 2)
-        }
+        },
+        "experience_factor": experience_factor
     }
+    }
+def get_llm_score(resume_dict, job_description, llm):
+    prompt = f"""
+    Given the following resume and job description, provide a similarity score between 0 and 100.
+    Consider factors like skills match, experience relevance, and overall fit.
+
+    Resume:
+    {resume_dict}
+
+    Job Description:
+    {job_description}
+
+    Provide only the numerical score between 0 and 100.
+    """
+    response = llm.complete(prompt)
+    try:
+        llm_score = float(response.text.strip())
+        return min(max(llm_score, 0), 100)  # Ensure score is between 0 and 100
+    except ValueError:
+        return None
 
 
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
@@ -247,7 +293,7 @@ def generate_model(file_paths):
         return None
 
 def main():
-    st.set_page_config(page_title="BRAINY BUDDY", page_icon="🧠", layout="wide")
+    st.set_page_config(page_title="KHOJO BHAI", page_icon="📝", layout="wide")
 
     # Custom CSS for improved UI
     st.markdown("""
@@ -290,7 +336,7 @@ def main():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("🧠 BRAINY BUDDY")
+    st.title("📝 KHOJO BHAI")
     st.markdown("#### Your AI-powered Resume Analyzer")
 
     if "file_paths" not in st.session_state:
@@ -320,10 +366,17 @@ def main():
                         resume_dict = eval(response)
                         score = advanced_ats_similarity_score(resume_dict, job_description)
                         
+                        # Get LLM score
+                        llm_score = get_llm_score(resume_dict, job_description, Settings.llm)
+                        
+                        # Calculate average score
+                        average_score = (score['similarity_score'] + llm_score) / 2 if llm_score is not None else score['similarity_score']
+                        
                         st.header("📊 Analysis Results")
-                        col1, col2 = st.columns(2)
+                        col1, col2, col3 = st.columns(3)
                         
                         with col1:
+                            st.subheader("ATS Score")
                             fig = go.Figure(data=[go.Pie(values=[score['similarity_score'], 100-score['similarity_score']], 
                                          hole=.3, 
                                          marker_colors=['#3498DB', '#ECF0F1'],
@@ -338,10 +391,39 @@ def main():
                             st.plotly_chart(fig)
                         
                         with col2:
-                            st.subheader("Match Status")
-                            status = "Accepted" if score['is_accepted'] else "Not Accepted"
-                            color = "#2ECC71" if score['is_accepted'] else "#E74C3C"
-                            st.markdown(f"<h2 style='text-align: center; color: {color};'>{status}</h2>", unsafe_allow_html=True)
+                            st.subheader("LLM Score")
+                            fig = go.Figure(data=[go.Pie(values=[llm_score, 100-llm_score], 
+                                         hole=.3, 
+                                         marker_colors=['#2ECC71', '#ECF0F1'],
+                                         textinfo='none')])
+                            fig.update_layout(
+                                annotations=[dict(text=f"{llm_score}%", x=0.5, y=0.5, font_size=20, showarrow=False)],
+                                margin=dict(t=0, b=0, l=0, r=0),
+                                height=300,
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
+                            )
+                            st.plotly_chart(fig)
+                        
+                        with col3:
+                            st.subheader("Average Score")
+                            fig = go.Figure(data=[go.Pie(values=[average_score, 100-average_score], 
+                                         hole=.3, 
+                                         marker_colors=['#9B59B6', '#ECF0F1'],
+                                         textinfo='none')])
+                            fig.update_layout(
+                                annotations=[dict(text=f"{average_score:.2f}%", x=0.5, y=0.5, font_size=20, showarrow=False)],
+                                margin=dict(t=0, b=0, l=0, r=0),
+                                height=300,
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
+                            )
+                            st.plotly_chart(fig)
+                        
+                        st.subheader("Match Status")
+                        status = "Accepted" if score['is_accepted'] else "Not Accepted"
+                        color = "#2ECC71" if score['is_accepted'] else "#E74C3C"
+                        st.markdown(f"<h2 style='text-align: center; color: {color};'>{status}</h2>", unsafe_allow_html=True)
                         
                         st.header("📈 Section Scores")
                         for section, section_score in score['section_scores'].items():
@@ -351,6 +433,9 @@ def main():
                                 st.progress(section_score / 100)
                             with col2:
                                 st.markdown(f"<h3 style='text-align: center; margin-top: 20px;'>{section_score}%</h3>", unsafe_allow_html=True)
+                        
+                        if score['experience_factor'] < 1:
+                            st.warning("Experience requirement not met. Score adjusted accordingly.")
                         
                         with st.expander("View Extracted Resume Details"):
                             st.json(resume_dict)
