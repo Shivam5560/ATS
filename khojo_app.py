@@ -316,7 +316,6 @@ def main():
             if job_description:
                 with st.spinner("Analyzing resume..."):
                     response = st.session_state.model.query(template).response
-                    st.markdown(response)
                     try:
                         resume_dict = eval(response)
                         score = advanced_ats_similarity_score(resume_dict, job_description)
@@ -357,7 +356,7 @@ def main():
                             st.json(resume_dict)
                     
                     except Exception as e:
-                        st.error(f"Error processing resume: {e}")
+                        st.error(f"Error processing resume , the text could not be extacted properly from your resume, do check your fonts and format properly.")
             else:
                 st.warning("Please enter a job description.")
     else:
