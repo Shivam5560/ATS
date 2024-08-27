@@ -145,11 +145,11 @@ def advanced_ats_similarity_score(resume_dict, job_description):
 #from llama_index.embeddings.mistralai import MistralAIEmbedding
 template = """You are an AI assistant trained to extract key information from resumes. Your task is to analyze the given resume text and extract relevant details into a structured dictionary format. Please follow these guidelines:
 
-1. Read the entire resume carefully.
+1. Read the entire resume carefully and extract all the subheaders with all the details in the following format , also do not change the headers subdata the order should be same.
 2. Extract the following information:
    - Personal Information (name, email, phone number)
    - Education (degrees, institutions, graduation dates)
-   - Work Experience (job titles, companies, dates, key responsibilities)
+   - Work Experience or Professional Expereinces(job titles, companies, dates, key responsibilities)
    - Skills
    - Projects (if any)
    - Certifications (if any)
@@ -187,7 +187,7 @@ template = """You are an AI assistant trained to extract key information from re
     "certifications": []
 }
 
-4. Fill in the dictionary with the extracted information.
+4. Fill in the dictionary with the extracted information and correct order also from the resume by cross checking with their headers and the exracted value.
 5. If any section is not present in the resume, leave it as an empty list or dictionary as appropriate.
 6. Ensure all extracted information is accurate and relevant.
 7. Return the completed dictionary.
