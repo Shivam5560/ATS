@@ -104,7 +104,7 @@ def calculate_section_score(section, job_desc):
     
     # Increase the base score and adjust the weights
     base_score = 0.5  # Start with a base score of 0.5
-    weighted_score = (keyword_score * 0.4 + fuzzy_score * 0.3 + tfidf_score * 0.3) * 0.5
+    weighted_score = (keyword_score * 0.4 + fuzzy_score * 0.3 + tfidf_score * 0.5) * 0.5
     
     return base_score + weighted_score
 
@@ -128,7 +128,7 @@ def advanced_ats_similarity_score(resume_dict, job_description):
     curved_score = min(1.0, final_score * 1.2)  # Increase scores by up to 20%
     
     score = round(curved_score * 100, 2)
-    is_accepted = score >= 65  # Lower the acceptance threshold
+    is_accepted = score >= 70  # Lower the acceptance threshold
 
     return {
         "similarity_score": score,
@@ -187,10 +187,11 @@ template = """You are an AI assistant trained to extract key information from re
     "certifications": []
 }
 
-4. Fill in the dictionary with the extracted information and correct order also from the resume by cross checking with their headers and the exracted value.
+4. Fill in the dictionary with the extracted information and in correct order also from the resume by cross checking with their headers and the exracted value.
 5. If any section is not present in the resume, leave it as an empty list or dictionary as appropriate.
 6. Ensure all extracted information is accurate and relevant.
 7. Return the completed dictionary.
+8. Match the dictionary key values with the resume subheaders like personal info and all and do the needfull.
 
 Resume text:
 [Insert resume text here]
