@@ -1,7 +1,8 @@
-** Live Demo
-Check out the live demo of Khojo Bhai: https://khojo-bhai.streamlit.app/
+## Live Demo
+Check out the live demo of Khojo Bhai
+ [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://khojo-bhai.streamlit.app/)
 
-** Installation
+## Installation
 To run this project locally, follow these steps:
 
 1.  Clone the repository: git clone https://github.com/Shivam5560/ATS.git
