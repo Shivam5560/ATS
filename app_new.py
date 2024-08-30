@@ -72,30 +72,58 @@ def dict_to_string(data):
 
     return "\n".join(result).strip()
 
-def advanced_ats_similarity_score(dictionary,jd):
-    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    model = DistilBertModel.from_pretrained('distilbert-base-uncased')
-    dictionary_str =  dict_to_string(dictionary)
+import spacy
+from transformers import AutoTokenizer, AutoModel
+import torch
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
-    # Tokenize and embed job descriptions
-    job_description_embeddings = []
-    tokens = tokenizer(jd, padding=True, truncation=True, return_tensors='pt')
+# Load pre-trained NLP models
+nlp = spacy.load("en_core_web_sm")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = AutoModel.from_pretrained("bert-base-uncased")
+
+def preprocess(text):
+    doc = nlp(text)
+    return " ".join([token.lemma_ for token in doc if not token.is_stop and token.is_alpha])
+
+def extract_entities(text):
+    doc = nlp(text)
+    entities = {ent.label_: ent.text for ent in doc.ents}
+    return entities
+
+def get_bert_embedding(text):
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
     with torch.no_grad():
-        output = model(**tokens)
-    embeddings = output.last_hidden_state.mean(dim=1).numpy()
-    job_description_embeddings.append(embeddings[0])
+        outputs = model(**inputs)
+    return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
 
-    # Tokenize and embed job descriptions
-    resume_embeddings = []
-    tokens = tokenizer(dictionary_str, padding=True, truncation=True, return_tensors='pt')
-    with torch.no_grad():
-        output = model(**tokens)
-    embeddings = output.last_hidden_state.mean(dim=1).numpy()
-    resume_embeddings.append(embeddings[0])  # Flatten the embeddings to 1D
+def calculate_similarity(job_desc, resume):
+    resume = dict_to_string(resume)
+    # Preprocess
+    job_desc_processed = preprocess(job_desc)
+    resume_processed = preprocess(resume)
+    
+    # Extract entities
+    job_entities = extract_entities(job_desc)
+    resume_entities = extract_entities(resume)
+    
+    # Get embeddings
+    job_embedding = get_bert_embedding(job_desc_processed)
+    resume_embedding = get_bert_embedding(resume_processed)
+    
+    # Calculate cosine similarity
+    similarity_score = cosine_similarity([job_embedding], [resume_embedding])[0][0]
+    
+    # Entity matching score (simplified)
+    entity_match_score = len(set(job_entities.values()) & set(resume_entities.values())) / len(job_entities)
+    
+    # Combine scores (you may want to adjust the weights)
+    final_score = 0.7 * similarity_score + 0.3 * entity_match_score
+    
+    return final_score
 
-    similarity_scores = cosine_similarity(job_description_embeddings, resume_embeddings)
-    print(similarity_scores)
-    return similarity_scores[0]
+
 
 
 
@@ -281,42 +309,9 @@ def main():
                     st.markdown(response)
                     try:
                         resume_dict = eval(response)
-                        score = advanced_ats_similarity_score(resume_dict, job_description)
-                        
+                        score = calculate_similarity(job_description,resume_dict)
                         st.header("📊 Analysis Results")
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            fig = go.Figure(data=[go.Pie(values=[score['similarity_score'], 100-score['similarity_score']], 
-                                         hole=.3, 
-                                         marker_colors=['#3498DB', '#ECF0F1'],
-                                         textinfo='none')])
-                            fig.update_layout(
-                                annotations=[dict(text=f"{score['similarity_score']}%", x=0.5, y=0.5, font_size=20, showarrow=False)],
-                                margin=dict(t=0, b=0, l=0, r=0),
-                                height=300,
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                plot_bgcolor='rgba(0,0,0,0)'
-                            )
-                            st.plotly_chart(fig)
-                        
-                        with col2:
-                            st.subheader("Match Status")
-                            status = "Accepted" if score['is_accepted'] else "Not Accepted"
-                            color = "#2ECC71" if score['is_accepted'] else "#E74C3C"
-                            st.markdown(f"<h2 style='text-align: center; color: {color};'>{status}</h2>", unsafe_allow_html=True)
-                        
-                        st.header("📈 Section Scores")
-                        for section, section_score in score['section_scores'].items():
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
-                                st.subheader(f"{section.replace('_', ' ').title()}")
-                                st.progress(section_score / 100)
-                            with col2:
-                                st.markdown(f"<h3 style='text-align: center; margin-top: 20px;'>{section_score}%</h3>", unsafe_allow_html=True)
-                        
-                        with st.expander("View Extracted Resume Details"):
-                            st.json(resume_dict)
+                        st.markdown(score)
                     
                     except Exception as e:
                         st.error(f"Error processing resume , the text could not be extacted properly from your resume, do check your fonts and format properly.")
