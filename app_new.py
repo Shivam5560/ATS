@@ -94,7 +94,8 @@ def advanced_ats_similarity_score(dictionary,jd):
     resume_embeddings.append(embeddings[0])  # Flatten the embeddings to 1D
 
     similarity_scores = cosine_similarity(job_description_embeddings, resume_embeddings)
-    return similarity_scores
+    print(similarity_scores)
+    return similarity_scores[0]
 
 
 
