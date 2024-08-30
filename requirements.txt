@@ -10,5 +10,5 @@ nltk
 fuzzywuzzy
 plotly
 spacy>=3.0.0,<4.0.0
-https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.7.3/en_core_web_trf-3.7.3.tar.gz
+en-core-web-sm @https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.7.3/en_core_web_trf-3.7.3.tar.gz
 transformers>=4.0.0,<5.0.0
